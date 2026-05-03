@@ -3,9 +3,10 @@ document.addEventListener('DOMContentLoaded', () => {
     authSystem.init();
 });
 
-// Authentication System
+// Authentication System with Cloud Sync
 const authSystem = {
     currentUser: null,
+    backendUrl: 'https://shop-sales-tracker-backend.glitch.me', // Cloud backend
 
     init() {
         this.setupAuthListeners();
@@ -43,7 +44,7 @@ const authSystem = {
         });
     },
 
-    login() {
+    async login() {
         const username = document.getElementById('loginUsername').value.trim();
         const password = document.getElementById('loginPassword').value;
 
@@ -52,6 +53,28 @@ const authSystem = {
             return;
         }
 
+        try {
+            // First try cloud login
+            const response = await fetch(`${this.backendUrl}/api/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            if (response.ok) {
+                const userData = await response.json();
+                this.currentUser = userData;
+                localStorage.setItem('currentUser', JSON.stringify(userData));
+                localStorage.setItem('authToken', userData.token);
+                this.showAppScreen();
+                this.displayWelcomeMessage();
+                return;
+            }
+        } catch (error) {
+            console.log('Cloud login unavailable, using local authentication');
+        }
+
+        // Fallback to local authentication
         const users = this.getUsers();
         const user = users.find(u => u.username === username);
 
@@ -72,7 +95,7 @@ const authSystem = {
         this.displayWelcomeMessage();
     },
 
-    signup() {
+    async signup() {
         const username = document.getElementById('signupUsername').value.trim();
         const password = document.getElementById('signupPassword').value;
         const confirmPassword = document.getElementById('signupConfirmPassword').value;
@@ -97,13 +120,36 @@ const authSystem = {
             return;
         }
 
+        try {
+            // Try cloud signup
+            const response = await fetch(`${this.backendUrl}/api/signup`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            if (response.ok) {
+                alert('Account created successfully! You can now log in.');
+                this.switchToLogin();
+                document.getElementById('loginUsername').value = username;
+                document.getElementById('loginPassword').value = '';
+                return;
+            } else {
+                const error = await response.json();
+                alert(error.message || 'Signup failed');
+                return;
+            }
+        } catch (error) {
+            console.log('Cloud signup unavailable, using local storage');
+        }
+
+        // Fallback to local signup
         const users = this.getUsers();
         if (users.find(u => u.username === username)) {
             alert('Username already exists. Please choose a different one.');
             return;
         }
 
-        // Create new user
         const newUser = {
             id: Date.now(),
             username: username,
@@ -124,6 +170,7 @@ const authSystem = {
         if (confirm('Are you sure you want to logout?')) {
             this.currentUser = null;
             localStorage.removeItem('currentUser');
+            localStorage.removeItem('authToken');
             this.showLoginScreen();
             document.getElementById('loginForm').reset();
             document.getElementById('signupForm').reset();
@@ -177,10 +224,11 @@ const authSystem = {
     }
 };
 
-// Main App
+// Main App with Cloud Sync
 const app = {
     todaysSales: [],
     salesHistory: [],
+    syncInterval: null,
 
     init() {
         this.loadData();
@@ -188,6 +236,7 @@ const app = {
         this.updateDisplay();
         this.displayDate();
         this.displayHistory();
+        this.startAutoSync();
     },
 
     setupEventListeners() {
@@ -228,12 +277,14 @@ const app = {
         this.saveData();
         this.updateDisplay();
         this.resetForm();
+        this.syncToCloud();
     },
 
     removeItem(id) {
         this.todaysSales = this.todaysSales.filter(item => item.id !== id);
         this.saveData();
         this.updateDisplay();
+        this.syncToCloud();
     },
 
     updateDisplay() {
@@ -278,7 +329,6 @@ const app = {
         }
 
         if (confirm('Are you sure you want to clear all sales for today? This will save them to history.')) {
-            // Save to history before clearing
             const dailySummary = {
                 date: new Date().toLocaleDateString(),
                 items: [...this.todaysSales],
@@ -287,11 +337,11 @@ const app = {
             };
             this.salesHistory.push(dailySummary);
 
-            // Clear today's sales
             this.todaysSales = [];
             this.saveData();
             this.updateDisplay();
             this.displayHistory();
+            this.syncToCloud();
             alert('Daily sales cleared and saved to history!');
         }
     },
@@ -362,7 +412,8 @@ const app = {
             todaysSales: this.todaysSales,
             salesHistory: this.salesHistory,
             lastSaveDate: new Date().toLocaleDateString(),
-            username: authSystem.currentUser.username
+            username: authSystem.currentUser.username,
+            lastSync: new Date().toISOString()
         };
         localStorage.setItem(`shopSalesData_${authSystem.currentUser.id}`, JSON.stringify(data));
     },
@@ -373,9 +424,7 @@ const app = {
             const data = JSON.parse(savedData);
             const today = new Date().toLocaleDateString();
 
-            // Reset today's sales if it's a new day
             if (data.lastSaveDate !== today) {
-                // If there were items from yesterday, save them to history
                 if (data.todaysSales && data.todaysSales.length > 0) {
                     const dailySummary = {
                         date: data.lastSaveDate,
@@ -391,6 +440,37 @@ const app = {
                 this.todaysSales = data.todaysSales || [];
                 this.salesHistory = data.salesHistory || [];
             }
+        }
+    },
+
+    startAutoSync() {
+        // Auto-sync every 30 seconds
+        this.syncInterval = setInterval(() => {
+            this.syncToCloud();
+        }, 30000);
+    },
+
+    async syncToCloud() {
+        const token = localStorage.getItem('authToken');
+        if (!token) return; // Only sync if using cloud auth
+
+        try {
+            const data = {
+                todaysSales: this.todaysSales,
+                salesHistory: this.salesHistory,
+                lastSaveDate: new Date().toLocaleDateString()
+            };
+
+            await fetch(`${authSystem.backendUrl}/api/sync-data`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            });
+        } catch (error) {
+            console.log('Cloud sync unavailable, data saved locally');
         }
     },
 
