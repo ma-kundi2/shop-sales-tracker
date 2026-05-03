@@ -1,8 +1,183 @@
 // Initialize the app
 document.addEventListener('DOMContentLoaded', () => {
-    initializeApp();
+    authSystem.init();
 });
 
+// Authentication System
+const authSystem = {
+    currentUser: null,
+
+    init() {
+        this.setupAuthListeners();
+        this.checkUserSession();
+    },
+
+    setupAuthListeners() {
+        // Login Form
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.login();
+        });
+
+        // Signup Form
+        document.getElementById('signupForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.signup();
+        });
+
+        // Switch to Signup
+        document.getElementById('switchToSignup').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.switchToSignup();
+        });
+
+        // Switch to Login
+        document.getElementById('switchToLogin').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.switchToLogin();
+        });
+
+        // Logout Button
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            this.logout();
+        });
+    },
+
+    login() {
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+
+        if (!username || !password) {
+            alert('Please enter both username and password');
+            return;
+        }
+
+        const users = this.getUsers();
+        const user = users.find(u => u.username === username);
+
+        if (!user) {
+            alert('Username not found. Please create an account first.');
+            return;
+        }
+
+        if (user.password !== password) {
+            alert('Incorrect password. Please try again.');
+            return;
+        }
+
+        // Login successful
+        this.currentUser = user;
+        localStorage.setItem('currentUser', JSON.stringify(user));
+        this.showAppScreen();
+        this.displayWelcomeMessage();
+    },
+
+    signup() {
+        const username = document.getElementById('signupUsername').value.trim();
+        const password = document.getElementById('signupPassword').value;
+        const confirmPassword = document.getElementById('signupConfirmPassword').value;
+
+        if (!username || !password || !confirmPassword) {
+            alert('Please fill in all fields');
+            return;
+        }
+
+        if (username.length < 3) {
+            alert('Username must be at least 3 characters long');
+            return;
+        }
+
+        if (password.length < 4) {
+            alert('Password must be at least 4 characters long');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            alert('Passwords do not match');
+            return;
+        }
+
+        const users = this.getUsers();
+        if (users.find(u => u.username === username)) {
+            alert('Username already exists. Please choose a different one.');
+            return;
+        }
+
+        // Create new user
+        const newUser = {
+            id: Date.now(),
+            username: username,
+            password: password,
+            createdAt: new Date().toLocaleDateString()
+        };
+
+        users.push(newUser);
+        localStorage.setItem('users', JSON.stringify(users));
+
+        alert('Account created successfully! You can now log in.');
+        this.switchToLogin();
+        document.getElementById('loginUsername').value = username;
+        document.getElementById('loginPassword').value = '';
+    },
+
+    logout() {
+        if (confirm('Are you sure you want to logout?')) {
+            this.currentUser = null;
+            localStorage.removeItem('currentUser');
+            this.showLoginScreen();
+            document.getElementById('loginForm').reset();
+            document.getElementById('signupForm').reset();
+        }
+    },
+
+    checkUserSession() {
+        const savedUser = localStorage.getItem('currentUser');
+        if (savedUser) {
+            this.currentUser = JSON.parse(savedUser);
+            this.showAppScreen();
+            this.displayWelcomeMessage();
+        } else {
+            this.showLoginScreen();
+        }
+    },
+
+    showLoginScreen() {
+        document.getElementById('loginScreen').classList.add('active');
+        document.getElementById('signupScreen').classList.remove('active');
+        document.getElementById('appScreen').classList.remove('active');
+    },
+
+    switchToSignup() {
+        document.getElementById('loginScreen').classList.remove('active');
+        document.getElementById('signupScreen').classList.add('active');
+    },
+
+    switchToLogin() {
+        document.getElementById('loginScreen').classList.add('active');
+        document.getElementById('signupScreen').classList.remove('active');
+    },
+
+    showAppScreen() {
+        document.getElementById('loginScreen').classList.remove('active');
+        document.getElementById('signupScreen').classList.remove('active');
+        document.getElementById('appScreen').classList.add('active');
+        app.init();
+    },
+
+    displayWelcomeMessage() {
+        const welcomeUser = document.getElementById('welcomeUser');
+        if (this.currentUser) {
+            welcomeUser.textContent = `Welcome, ${this.currentUser.username}! 👋`;
+        }
+    },
+
+    getUsers() {
+        const users = localStorage.getItem('users');
+        return users ? JSON.parse(users) : [];
+    }
+};
+
+// Main App
 const app = {
     todaysSales: [],
     salesHistory: [],
@@ -154,7 +329,8 @@ const app = {
         }
 
         const today = new Date().toLocaleDateString();
-        let csv = 'Shop Sales Report - ' + today + '\n\n';
+        let csv = 'Shop Sales Report - ' + today + '\n';
+        csv += 'User: ' + authSystem.currentUser.username + '\n\n';
         csv += 'Item,Quantity,Price per Item,Total\n';
 
         this.todaysSales.forEach(item => {
@@ -170,7 +346,7 @@ const app = {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `sales_${today}.csv`;
+        a.download = `sales_${authSystem.currentUser.username}_${today}.csv`;
         a.click();
         window.URL.revokeObjectURL(url);
     },
@@ -185,13 +361,14 @@ const app = {
         const data = {
             todaysSales: this.todaysSales,
             salesHistory: this.salesHistory,
-            lastSaveDate: new Date().toLocaleDateString()
+            lastSaveDate: new Date().toLocaleDateString(),
+            username: authSystem.currentUser.username
         };
-        localStorage.setItem('shopSalesData', JSON.stringify(data));
+        localStorage.setItem(`shopSalesData_${authSystem.currentUser.id}`, JSON.stringify(data));
     },
 
     loadData() {
-        const savedData = localStorage.getItem('shopSalesData');
+        const savedData = localStorage.getItem(`shopSalesData_${authSystem.currentUser.id}`);
         if (savedData) {
             const data = JSON.parse(savedData);
             const today = new Date().toLocaleDateString();
@@ -223,7 +400,3 @@ const app = {
         return div.innerHTML;
     }
 };
-
-function initializeApp() {
-    app.init();
-}
