@@ -311,8 +311,8 @@ const app = {
             <tr>
                 <td>${this.escapeHtml(item.name)}</td>
                 <td>${item.quantity}</td>
-                <td>$${item.price.toFixed(2)}</td>
-                <td>$${item.total.toFixed(2)}</td>
+                <td>TSh ${item.price.toFixed(2)}</td>
+                <td>TSh ${item.total.toFixed(2)}</td>
                 <td>
                     <button class="btn btn-danger" onclick="app.removeItem(${item.id})">Delete</button>
                 </td>
@@ -364,7 +364,7 @@ const app = {
                 <div class="history-date">📅 ${day.date}</div>
                 <div class="history-details">
                     <strong>Items Sold:</strong> ${day.totalItems} | 
-                    <strong>Total Revenue:</strong> $${day.totalRevenue.toFixed(2)}
+                    <strong>Total Revenue:</strong> TSh ${day.totalRevenue.toFixed(2)}
                 </div>
             </div>
         `).join('');
@@ -379,7 +379,7 @@ const app = {
         const today = new Date().toLocaleDateString();
         let csv = 'Shop Sales Report - ' + today + '\n';
         csv += 'User: ' + authSystem.currentUser.username + '\n\n';
-        csv += 'Item,Quantity,Price per Item,Total\n';
+        csv += 'Item,Quantity,Price per Item (TSh),Total (TSh)\n';
 
         this.todaysSales.forEach(item => {
             csv += `"${item.name}",${item.quantity},${item.price.toFixed(2)},${item.total.toFixed(2)}\n`;
