@@ -294,10 +294,8 @@ const app = {
 
     updateStats() {
         const totalItems = this.todaysSales.reduce((sum, item) => sum + item.quantity, 0);
-        const totalRevenue = this.todaysSales.reduce((sum, item) => sum + item.total, 0);
 
         document.getElementById('totalItems').textContent = totalItems;
-        document.getElementById('totalRevenue').textContent = '$' + totalRevenue.toFixed(2);
     },
 
     displayItems() {
