@@ -351,6 +351,14 @@ const app = {
         document.getElementById('dateDisplay').textContent = dateString;
     },
 
+    toggleHistoryDetails(index) {
+        const detailsId = `history-details-${index}`;
+        const details = document.getElementById(detailsId);
+        if (details) {
+            details.classList.toggle('visible');
+        }
+    },
+
     displayHistory() {
         const historyContainer = document.getElementById('historyContainer');
 
@@ -361,10 +369,35 @@ const app = {
 
         historyContainer.innerHTML = this.salesHistory.map((day, index) => `
             <div class="history-card">
-                <div class="history-date">📅 ${day.date}</div>
-                <div class="history-details">
-                    <strong>Items Sold:</strong> ${day.totalItems} | 
-                    <strong>Total Revenue:</strong> TSh ${day.totalRevenue.toFixed(2)}
+                <div class="history-header" onclick="app.toggleHistoryDetails(${index})" style="cursor: pointer;">
+                    <div class="history-date">📅 ${day.date}</div>
+                    <div class="history-summary">
+                        <strong>Items Sold:</strong> ${day.totalItems} | 
+                        <strong>Total Revenue:</strong> TSh ${day.totalRevenue.toFixed(2)}
+                    </div>
+                    <div class="history-toggle">▼</div>
+                </div>
+                <div id="history-details-${index}" class="history-details-list">
+                    <table class="history-items-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Quantity</th>
+                                <th>Price</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${day.items.map(item => `
+                                <tr>
+                                    <td>${this.escapeHtml(item.name)}</td>
+                                    <td>${item.quantity}</td>
+                                    <td>TSh ${item.price.toFixed(2)}</td>
+                                    <td>TSh ${item.total.toFixed(2)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         `).join('');
