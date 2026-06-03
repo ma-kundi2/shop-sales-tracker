@@ -1,334 +1,557 @@
-// Shop Sales Tracker - JavaScript Logic
+// Enhanced script.js with cloud authentication support
+// Initialize the app
+document.addEventListener('DOMContentLoaded', () => {
+    authSystem.init();
+});
 
-// Data Management
-class ShopTracker {
-    constructor() {
-        this.products = this.loadFromLocalStorage();
-        this.init();
-    }
+// Authentication System with Cloud Sync
+const authSystem = {
+    currentUser: null,
+    // Cloud backend URL - You'll need to deploy this
+    backendUrl: 'https://shop-sales-tracker-api.herokuapp.com',
 
     init() {
-        this.attachEventListeners();
-        this.renderProducts();
-        this.updateSummary();
-        this.setTodayDate();
-    }
+        this.setupAuthListeners();
+        this.checkUserSession();
+    },
 
-    attachEventListeners() {
-        document.getElementById('productForm').addEventListener('submit', (e) => this.addProduct(e));
-        document.getElementById('searchBox').addEventListener('input', () => this.filterProducts());
-        document.getElementById('filterStatus').addEventListener('change', () => this.filterProducts());
-        document.getElementById('exportBtn').addEventListener('click', () => this.exportToCSV());
-        document.getElementById('printBtn').addEventListener('click', () => this.printInventory());
-    }
+    setupAuthListeners() {
+        // Login Form
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.login();
+        });
 
-    setTodayDate() {
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('purchaseDate').value = today;
-    }
+        // Signup Form
+        document.getElementById('signupForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.signup();
+        });
 
-    addProduct(event) {
-        event.preventDefault();
+        // Switch to Signup
+        document.getElementById('switchToSignup').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.switchToSignup();
+        });
 
-        const product = {
+        // Switch to Login
+        document.getElementById('switchToLogin').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.switchToLogin();
+        });
+
+        // Logout Button
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            this.logout();
+        });
+    },
+
+    async login() {
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+
+        if (!username || !password) {
+            alert('Please enter both username and password');
+            return;
+        }
+
+        try {
+            // Try cloud login first
+            const response = await fetch(`${this.backendUrl}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            if (response.ok) {
+                const userData = await response.json();
+                this.currentUser = userData.user;
+                localStorage.setItem('currentUser', JSON.stringify(userData.user));
+                localStorage.setItem('authToken', userData.token);
+                localStorage.setItem('useCloud', 'true');
+                this.showAppScreen();
+                this.displayWelcomeMessage();
+                app.syncDataFromCloud();
+                return;
+            } else {
+                const error = await response.json();
+                alert(error.message || 'Login failed');
+                return;
+            }
+        } catch (error) {
+            console.log('Cloud login unavailable, using local authentication');
+            this.loginLocalUser(username, password);
+        }
+    },
+
+    loginLocalUser(username, password) {
+        const users = this.getUsers();
+        const user = users.find(u => u.username === username);
+
+        if (!user) {
+            alert('Username not found. Please create an account first.');
+            return;
+        }
+
+        if (user.password !== password) {
+            alert('Incorrect password. Please try again.');
+            return;
+        }
+
+        // Login successful
+        this.currentUser = user;
+        localStorage.setItem('currentUser', JSON.stringify(user));
+        localStorage.setItem('useCloud', 'false');
+        this.showAppScreen();
+        this.displayWelcomeMessage();
+    },
+
+    async signup() {
+        const username = document.getElementById('signupUsername').value.trim();
+        const password = document.getElementById('signupPassword').value;
+        const confirmPassword = document.getElementById('signupConfirmPassword').value;
+
+        if (!username || !password || !confirmPassword) {
+            alert('Please fill in all fields');
+            return;
+        }
+
+        if (username.length < 3) {
+            alert('Username must be at least 3 characters long');
+            return;
+        }
+
+        if (password.length < 4) {
+            alert('Password must be at least 4 characters long');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            alert('Passwords do not match');
+            return;
+        }
+
+        try {
+            // Try cloud signup
+            const response = await fetch(`${this.backendUrl}/api/auth/signup`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            if (response.ok) {
+                alert('Account created successfully! You can now log in.');
+                this.switchToLogin();
+                document.getElementById('loginUsername').value = username;
+                document.getElementById('loginPassword').value = '';
+                return;
+            } else {
+                const error = await response.json();
+                alert(error.message || 'Signup failed');
+                return;
+            }
+        } catch (error) {
+            console.log('Cloud signup unavailable, using local storage');
+            this.signupLocalUser(username, password);
+        }
+    },
+
+    signupLocalUser(username, password) {
+        const users = this.getUsers();
+        if (users.find(u => u.username === username)) {
+            alert('Username already exists. Please choose a different one.');
+            return;
+        }
+
+        const newUser = {
             id: Date.now(),
-            name: document.getElementById('productName').value.trim(),
-            price: parseFloat(document.getElementById('productPrice').value),
-            quantity: parseFloat(document.getElementById('productQuantity').value),
-            unit: document.getElementById('productUnit').value.trim(),
-            purchaseDate: document.getElementById('purchaseDate').value,
+            username: username,
+            password: password,
+            createdAt: new Date().toLocaleDateString()
         };
 
-        if (product.name && product.price > 0 && product.quantity > 0) {
-            this.products.push(product);
-            this.saveToLocalStorage();
-            this.renderProducts();
-            this.updateSummary();
-            document.getElementById('productForm').reset();
-            this.setTodayDate();
-            this.showNotification('Product added successfully!', 'success');
+        users.push(newUser);
+        localStorage.setItem('users', JSON.stringify(users));
+
+        alert('Account created successfully! You can now log in.');
+        this.switchToLogin();
+        document.getElementById('loginUsername').value = username;
+        document.getElementById('loginPassword').value = '';
+    },
+
+    logout() {
+        if (confirm('Are you sure you want to logout?')) {
+            this.currentUser = null;
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('useCloud');
+            this.showLoginScreen();
+            document.getElementById('loginForm').reset();
+            document.getElementById('signupForm').reset();
+        }
+    },
+
+    checkUserSession() {
+        const savedUser = localStorage.getItem('currentUser');
+        if (savedUser) {
+            this.currentUser = JSON.parse(savedUser);
+            this.showAppScreen();
+            this.displayWelcomeMessage();
         } else {
-            this.showNotification('Please fill in all fields correctly', 'error');
+            this.showLoginScreen();
         }
-    }
+    },
 
-    deleteProduct(id) {
-        if (confirm('Are you sure you want to delete this product?')) {
-            this.products = this.products.filter(p => p.id !== id);
-            this.saveToLocalStorage();
-            this.renderProducts();
-            this.updateSummary();
-            this.showNotification('Product deleted successfully!', 'success');
+    showLoginScreen() {
+        document.getElementById('loginScreen').classList.add('active');
+        document.getElementById('signupScreen').classList.remove('active');
+        document.getElementById('appScreen').classList.remove('active');
+    },
+
+    switchToSignup() {
+        document.getElementById('loginScreen').classList.remove('active');
+        document.getElementById('signupScreen').classList.add('active');
+    },
+
+    switchToLogin() {
+        document.getElementById('loginScreen').classList.add('active');
+        document.getElementById('signupScreen').classList.remove('active');
+    },
+
+    showAppScreen() {
+        document.getElementById('loginScreen').classList.remove('active');
+        document.getElementById('signupScreen').classList.remove('active');
+        document.getElementById('appScreen').classList.add('active');
+        app.init();
+    },
+
+    displayWelcomeMessage() {
+        const welcomeUser = document.getElementById('welcomeUser');
+        if (this.currentUser) {
+            welcomeUser.textContent = `Welcome, ${this.currentUser.username}! 👋`;
         }
-    }
+    },
 
-    updateQuantity(id, newQuantity) {
-        const product = this.products.find(p => p.id === id);
-        if (product) {
-            product.quantity = Math.max(0, parseFloat(newQuantity));
-            this.saveToLocalStorage();
-            this.renderProducts();
-            this.updateSummary();
-        }
+    getUsers() {
+        const users = localStorage.getItem('users');
+        return users ? JSON.parse(users) : [];
     }
+};
 
-    renderProducts() {
-        const tableBody = document.getElementById('productsTableBody');
-        
-        if (this.products.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="8" class="empty-message">No products added yet</td></tr>';
+// Main App with Cloud Sync
+const app = {
+    todaysSales: [],
+    salesHistory: [],
+    syncInterval: null,
+
+    init() {
+        this.loadData();
+        this.setupEventListeners();
+        this.updateDisplay();
+        this.displayDate();
+        this.displayHistory();
+        this.startAutoSync();
+    },
+
+    setupEventListeners() {
+        document.getElementById('itemForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.addItem();
+        });
+
+        document.getElementById('clearDayBtn').addEventListener('click', () => {
+            this.clearDay();
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            this.exportAsCSV();
+        });
+    },
+
+    addItem() {
+        const itemName = document.getElementById('itemName').value.trim();
+        const quantity = parseInt(document.getElementById('quantity').value);
+        const price = parseFloat(document.getElementById('price').value);
+
+        if (!itemName || quantity <= 0 || price < 0) {
+            alert('Please enter valid information');
             return;
         }
 
-        tableBody.innerHTML = this.products
-            .map(product => this.createProductRow(product))
-            .join('');
+        const item = {
+            id: Date.now(),
+            name: itemName,
+            quantity: quantity,
+            price: price,
+            total: quantity * price,
+            timestamp: new Date().toLocaleTimeString()
+        };
 
-        // Attach event listeners to delete buttons
-        document.querySelectorAll('.btn-danger').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const id = parseInt(e.target.dataset.id);
-                this.deleteProduct(id);
-            });
-        });
+        this.todaysSales.push(item);
+        this.saveData();
+        this.updateDisplay();
+        this.resetForm();
+        this.syncToCloud();
+    },
 
-        // Attach event listeners to quantity inputs
-        document.querySelectorAll('.quantity-input').forEach(input => {
-            input.addEventListener('change', (e) => {
-                const id = parseInt(e.target.dataset.id);
-                this.updateQuantity(id, e.target.value);
-            });
-        });
-    }
+    removeItem(id) {
+        this.todaysSales = this.todaysSales.filter(item => item.id !== id);
+        this.saveData();
+        this.updateDisplay();
+        this.syncToCloud();
+    },
 
-    createProductRow(product) {
-        const totalValue = product.price * product.quantity;
-        const status = this.getProductStatus(product.quantity);
-        const statusClass = this.getStatusClass(status);
+    updateDisplay() {
+        this.updateStats();
+        this.displayItems();
+    },
 
-        const formattedDate = new Date(product.purchaseDate).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
+    updateStats() {
+        const totalItems = this.todaysSales.reduce((sum, item) => sum + item.quantity, 0);
 
-        return `
+        document.getElementById('totalItems').textContent = totalItems;
+    },
+
+    displayItems() {
+        const itemsList = document.getElementById('itemsList');
+        const emptyState = '<tr class="empty-state"><td colspan="5">No items added yet. Add your first sale above!</td></tr>';
+
+        if (this.todaysSales.length === 0) {
+            itemsList.innerHTML = emptyState;
+            return;
+        }
+
+        itemsList.innerHTML = this.todaysSales.map(item => `
             <tr>
-                <td><strong>${this.escapeHtml(product.name)}</strong></td>
-                <td>$${product.price.toFixed(2)}</td>
+                <td>${this.escapeHtml(item.name)}</td>
+                <td>${item.quantity}</td>
+                <td>TSh ${item.price.toFixed(2)}</td>
+                <td>TSh ${item.total.toFixed(2)}</td>
                 <td>
-                    <input type="number" class="quantity-input" data-id="${product.id}" 
-                           value="${product.quantity}" min="0" step="0.01" style="width: 80px;">
-                </td>
-                <td>${this.escapeHtml(product.unit)}</td>
-                <td>${formattedDate}</td>
-                <td><span class="status-badge ${statusClass}">${status}</span></td>
-                <td><strong>$${totalValue.toFixed(2)}</strong></td>
-                <td>
-                    <button class="btn btn-danger" data-id="${product.id}">Delete</button>
+                    <button class="btn btn-danger" onclick="app.removeItem(${item.id})">Delete</button>
                 </td>
             </tr>
-        `;
-    }
+        `).join('');
+    },
 
-    getProductStatus(quantity) {
-        if (quantity === 0) return 'Out of Stock';
-        if (quantity < 5) return 'Low Stock';
-        return 'In Stock';
-    }
-
-    getStatusClass(status) {
-        switch(status) {
-            case 'In Stock': return 'status-in-stock';
-            case 'Low Stock': return 'status-low-stock';
-            case 'Out of Stock': return 'status-out-stock';
-            default: return '';
-        }
-    }
-
-    filterProducts() {
-        const searchTerm = document.getElementById('searchBox').value.toLowerCase();
-        const filterStatus = document.getElementById('filterStatus').value;
-
-        const filtered = this.products.filter(product => {
-            const matchesSearch = product.name.toLowerCase().includes(searchTerm);
-            const productStatus = this.getProductStatus(product.quantity);
-            
-            let matchesFilter = true;
-            if (filterStatus === 'in-stock') matchesFilter = productStatus === 'In Stock';
-            if (filterStatus === 'low-stock') matchesFilter = productStatus === 'Low Stock';
-            if (filterStatus === 'out-stock') matchesFilter = productStatus === 'Out of Stock';
-
-            return matchesSearch && matchesFilter;
-        });
-
-        this.renderFilteredProducts(filtered);
-    }
-
-    renderFilteredProducts(filtered) {
-        const tableBody = document.getElementById('productsTableBody');
-        
-        if (filtered.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="8" class="empty-message">No products match your search</td></tr>';
+    clearDay() {
+        if (this.todaysSales.length === 0) {
+            alert('No items to clear!');
             return;
         }
 
-        tableBody.innerHTML = filtered
-            .map(product => this.createProductRow(product))
-            .join('');
+        if (confirm('Are you sure you want to clear all sales for today? This will save them to history.')) {
+            const dailySummary = {
+                date: new Date().toLocaleDateString(),
+                items: [...this.todaysSales],
+                totalItems: this.todaysSales.reduce((sum, item) => sum + item.quantity, 0),
+                totalRevenue: this.todaysSales.reduce((sum, item) => sum + item.total, 0)
+            };
+            this.salesHistory.push(dailySummary);
 
-        document.querySelectorAll('.btn-danger').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const id = parseInt(e.target.dataset.id);
-                this.deleteProduct(id);
+            this.todaysSales = [];
+            this.saveData();
+            this.updateDisplay();
+            this.displayHistory();
+            this.syncToCloud();
+            alert('Daily sales cleared and saved to history!');
+        }
+    },
+
+    displayDate() {
+        const today = new Date();
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const dateString = today.toLocaleDateString('en-US', options);
+        document.getElementById('dateDisplay').textContent = dateString;
+    },
+
+    toggleHistoryDetails(index) {
+        const detailsId = `history-details-${index}`;
+        const details = document.getElementById(detailsId);
+        if (details) {
+            details.classList.toggle('visible');
+        }
+    },
+
+    displayHistory() {
+        const historyContainer = document.getElementById('historyContainer');
+
+        if (this.salesHistory.length === 0) {
+            historyContainer.innerHTML = '<p class="empty-state">No previous sales records yet.</p>';
+            return;
+        }
+
+        historyContainer.innerHTML = this.salesHistory.map((day, index) => `
+            <div class="history-card">
+                <div class="history-header" onclick="app.toggleHistoryDetails(${index})" style="cursor: pointer;">
+                    <div class="history-date">📅 ${day.date}</div>
+                    <div class="history-summary">
+                        <strong>Items Sold:</strong> ${day.totalItems} | 
+                        <strong>Total Revenue:</strong> TSh ${day.totalRevenue.toFixed(2)}
+                    </div>
+                    <div class="history-toggle">▼</div>
+                </div>
+                <div id="history-details-${index}" class="history-details-list">
+                    <table class="history-items-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Quantity</th>
+                                <th>Price</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${day.items.map(item => `
+                                <tr>
+                                    <td>${this.escapeHtml(item.name)}</td>
+                                    <td>${item.quantity}</td>
+                                    <td>TSh ${item.price.toFixed(2)}</td>
+                                    <td>TSh ${item.total.toFixed(2)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `).join('');
+    },
+
+    exportAsCSV() {
+        if (this.todaysSales.length === 0) {
+            alert('No items to export!');
+            return;
+        }
+
+        const today = new Date().toLocaleDateString();
+        let csv = 'Shop Sales Report - ' + today + '\n';
+        csv += 'User: ' + authSystem.currentUser.username + '\n\n';
+        csv += 'Item,Quantity,Price per Item (TSh),Total (TSh)\n';
+
+        this.todaysSales.forEach(item => {
+            csv += `"${item.name}",${item.quantity},${item.price.toFixed(2)},${item.total.toFixed(2)}\n`;
+        });
+
+        const totalItems = this.todaysSales.reduce((sum, item) => sum + item.quantity, 0);
+        const totalRevenue = this.todaysSales.reduce((sum, item) => sum + item.total, 0);
+
+        csv += '\nTOTAL,' + totalItems + ',,' + totalRevenue.toFixed(2) + '\n';
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `sales_${authSystem.currentUser.username}_${today}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    },
+
+    resetForm() {
+        document.getElementById('itemForm').reset();
+        document.getElementById('quantity').value = '1';
+        document.getElementById('itemName').focus();
+    },
+
+    saveData() {
+        const data = {
+            todaysSales: this.todaysSales,
+            salesHistory: this.salesHistory,
+            lastSaveDate: new Date().toLocaleDateString(),
+            username: authSystem.currentUser.username,
+            lastSync: new Date().toISOString()
+        };
+        localStorage.setItem(`shopSalesData_${authSystem.currentUser.id}`, JSON.stringify(data));
+    },
+
+    loadData() {
+        const savedData = localStorage.getItem(`shopSalesData_${authSystem.currentUser.id}`);
+        if (savedData) {
+            const data = JSON.parse(savedData);
+            const today = new Date().toLocaleDateString();
+
+            if (data.lastSaveDate !== today) {
+                if (data.todaysSales && data.todaysSales.length > 0) {
+                    const dailySummary = {
+                        date: data.lastSaveDate,
+                        items: data.todaysSales,
+                        totalItems: data.todaysSales.reduce((sum, item) => sum + item.quantity, 0),
+                        totalRevenue: data.todaysSales.reduce((sum, item) => sum + item.total, 0)
+                    };
+                    this.salesHistory = data.salesHistory || [];
+                    this.salesHistory.push(dailySummary);
+                }
+                this.todaysSales = [];
+            } else {
+                this.todaysSales = data.todaysSales || [];
+                this.salesHistory = data.salesHistory || [];
+            }
+        }
+    },
+
+    startAutoSync() {
+        // Auto-sync every 30 seconds
+        this.syncInterval = setInterval(() => {
+            this.syncToCloud();
+        }, 30000);
+    },
+
+    async syncToCloud() {
+        const useCloud = localStorage.getItem('useCloud') === 'true';
+        if (!useCloud) return;
+
+        const token = localStorage.getItem('authToken');
+        if (!token) return;
+
+        try {
+            const data = {
+                todaysSales: this.todaysSales,
+                salesHistory: this.salesHistory,
+                lastSaveDate: new Date().toLocaleDateString()
+            };
+
+            await fetch(`${authSystem.backendUrl}/api/data/sync`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
             });
-        });
+        } catch (error) {
+            console.log('Cloud sync unavailable, data saved locally');
+        }
+    },
 
-        document.querySelectorAll('.quantity-input').forEach(input => {
-            input.addEventListener('change', (e) => {
-                const id = parseInt(e.target.dataset.id);
-                this.updateQuantity(id, e.target.value);
+    async syncDataFromCloud() {
+        const useCloud = localStorage.getItem('useCloud') === 'true';
+        if (!useCloud) return;
+
+        const token = localStorage.getItem('authToken');
+        if (!token) return;
+
+        try {
+            const response = await fetch(`${authSystem.backendUrl}/api/data/get`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
             });
-        });
-    }
 
-    updateSummary() {
-        const totalProducts = this.products.length;
-        const inStockCount = this.products.filter(p => this.getProductStatus(p.quantity) === 'In Stock').length;
-        const outStockCount = this.products.filter(p => this.getProductStatus(p.quantity) === 'Out of Stock').length;
-        const totalInvestment = this.products.reduce((sum, p) => sum + (p.price * p.quantity), 0);
-
-        document.getElementById('totalProducts').textContent = totalProducts;
-        document.getElementById('inStockCount').textContent = inStockCount;
-        document.getElementById('outStockCount').textContent = outStockCount;
-        document.getElementById('totalInvestment').textContent = `$${totalInvestment.toFixed(2)}`;
-    }
-
-    exportToCSV() {
-        if (this.products.length === 0) {
-            this.showNotification('No products to export', 'warning');
-            return;
+            if (response.ok) {
+                const data = await response.json();
+                this.todaysSales = data.todaysSales || [];
+                this.salesHistory = data.salesHistory || [];
+                this.updateDisplay();
+                this.displayHistory();
+            }
+        } catch (error) {
+            console.log('Could not sync data from cloud');
         }
-
-        let csv = 'Product Name,Price,Quantity,Unit,Purchase Date,Status,Total Value\n';
-        
-        this.products.forEach(product => {
-            const totalValue = product.price * product.quantity;
-            const status = this.getProductStatus(product.quantity);
-            csv += `"${product.name}","${product.price.toFixed(2)}","${product.quantity}","${product.unit}","${product.purchaseDate}","${status}","${totalValue.toFixed(2)}"\n`;
-        });
-
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-
-        link.setAttribute('href', url);
-        link.setAttribute('download', `shop-inventory-${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = 'hidden';
-
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        this.showNotification('Inventory exported successfully!', 'success');
-    }
-
-    printInventory() {
-        if (this.products.length === 0) {
-            this.showNotification('No products to print', 'warning');
-            return;
-        }
-
-        const printWindow = window.open('', '', 'height=600,width=800');
-        printWindow.document.write('<html><head><title>Shop Inventory</title>');
-        printWindow.document.write('<style>');
-        printWindow.document.write('body { font-family: Arial, sans-serif; margin: 20px; }');
-        printWindow.document.write('h1 { text-align: center; color: #2563eb; }');
-        printWindow.document.write('table { width: 100%; border-collapse: collapse; margin-top: 20px; }');
-        printWindow.document.write('th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }');
-        printWindow.document.write('th { background-color: #f3f4f6; font-weight: bold; }');
-        printWindow.document.write('tr:nth-child(even) { background-color: #f9fafb; }');
-        printWindow.document.write('.summary { margin-top: 20px; padding: 10px; background-color: #f3f4f6; }');
-        printWindow.document.write('</style></head><body>');
-
-        printWindow.document.write('<h1>Shop Inventory Report</h1>');
-        printWindow.document.write(`<p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>`);
-
-        printWindow.document.write('<table>');
-        printWindow.document.write('<thead><tr>');
-        printWindow.document.write('<th>Product Name</th>');
-        printWindow.document.write('<th>Price</th>');
-        printWindow.document.write('<th>Quantity</th>');
-        printWindow.document.write('<th>Unit</th>');
-        printWindow.document.write('<th>Purchase Date</th>');
-        printWindow.document.write('<th>Status</th>');
-        printWindow.document.write('<th>Total Value</th>');
-        printWindow.document.write('</tr></thead>');
-        printWindow.document.write('<tbody>');
-
-        const totalInvestment = this.products.reduce((sum, p) => sum + (p.price * p.quantity), 0);
-
-        this.products.forEach(product => {
-            const totalValue = product.price * product.quantity;
-            const status = this.getProductStatus(product.quantity);
-            printWindow.document.write('<tr>');
-            printWindow.document.write(`<td>${product.name}</td>`);
-            printWindow.document.write(`<td>$${product.price.toFixed(2)}</td>`);
-            printWindow.document.write(`<td>${product.quantity}</td>`);
-            printWindow.document.write(`<td>${product.unit}</td>`);
-            printWindow.document.write(`<td>${product.purchaseDate}</td>`);
-            printWindow.document.write(`<td>${status}</td>`);
-            printWindow.document.write(`<td>$${totalValue.toFixed(2)}</td>`);
-            printWindow.document.write('</tr>');
-        });
-
-        printWindow.document.write('</tbody></table>');
-        printWindow.document.write(`<div class="summary"><strong>Total Investment: $${totalInvestment.toFixed(2)}</strong></div>`);
-        printWindow.document.write('</body></html>');
-        printWindow.document.close();
-        printWindow.print();
-    }
-
-    saveToLocalStorage() {
-        localStorage.setItem('shopTrackerProducts', JSON.stringify(this.products));
-    }
-
-    loadFromLocalStorage() {
-        const data = localStorage.getItem('shopTrackerProducts');
-        return data ? JSON.parse(data) : [];
-    }
-
-    showNotification(message, type) {
-        // Create a simple notification (can be enhanced with a toast library)
-        const notification = document.createElement('div');
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            background-color: ${type === 'success' ? '#16a34a' : type === 'error' ? '#dc2626' : '#ea580c'};
-            color: white;
-            border-radius: 6px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-            font-weight: 600;
-        `;
-        notification.textContent = message;
-        document.body.appendChild(notification);
-
-        setTimeout(() => {
-            notification.remove();
-        }, 3000);
-    }
+    },
 
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
-}
-
-// Initialize the app when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-    new ShopTracker();
-});
+};
