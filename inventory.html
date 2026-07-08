@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop Sales Tracker - Inventory</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen active">
+        <div class="login-container">
+            <div class="login-card">
+                <h1 class="login-title">🏪 Shop Sales Tracker</h1>
+                <p class="login-subtitle">Sign in to your account</p>
+
+                <form id="loginForm" class="login-form">
+                    <div class="form-group">
+                        <label for="loginUsername">Username:</label>
+                        <input 
+                            type="text" 
+                            id="loginUsername" 
+                            placeholder="Enter your username" 
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="loginPassword">Password:</label>
+                        <input 
+                            type="password" 
+                            id="loginPassword" 
+                            placeholder="Enter your password" 
+                            required
+                        >
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Sign In</button>
+                </form>
+
+                <div class="login-footer">
+                    <p>Don't have an account? <a href="#" id="switchToSignup">Sign up here</a></p>
+                    <p style="margin-top: 15px; font-size: 0.9em; color: #999;">
+                        💡 Tip: Login from any device and your data syncs automatically!
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Signup Screen -->
+    <div id="signupScreen" class="login-screen">
+        <div class="login-container">
+            <div class="login-card">
+                <h1 class="login-title">🏪 Shop Sales Tracker</h1>
+                <p class="login-subtitle">Create a new account</p>
+
+                <form id="signupForm" class="login-form">
+                    <div class="form-group">
+                        <label for="signupUsername">Username:</label>
+                        <input 
+                            type="text" 
+                            id="signupUsername" 
+                            placeholder="Choose a username (min 3 characters)" 
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="signupPassword">Password:</label>
+                        <input 
+                            type="password" 
+                            id="signupPassword" 
+                            placeholder="Create a password (min 4 characters)" 
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="signupConfirmPassword">Confirm Password:</label>
+                        <input 
+                            type="password" 
+                            id="signupConfirmPassword" 
+                            placeholder="Confirm your password" 
+                            required
+                        >
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Create Account</button>
+                </form>
+
+                <div class="login-footer">
+                    <p>Already have an account? <a href="#" id="switchToLogin">Sign in here</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="appScreen" class="app-screen">
+        <div class="container">
+            <header>
+                <div class="header-content">
+                    <div>
+                        <h1>📦 Inventory Management</h1>
+                        <p class="subtitle">Manage your shop products and stock levels</p>
+                    </div>
+                    <div class="header-right">
+                        <span id="welcomeUser" class="welcome-text"></span>
+                        <button id="logoutBtn" class="btn btn-logout">Logout</button>
+                    </div>
+                </div>
+            </header>
+
+            <main>
+                <!-- Navigation Tabs -->
+                <div class="nav-tabs">
+                    <a href="index.html" class="nav-tab">📈 Sales</a>
+                    <a href="purchases.html" class="nav-tab">📦 Purchases</a>
+                    <a href="inventory.html" class="nav-tab active">📋 Inventory</a>
+                </div>
+
+                <!-- Add Product Section -->
+                <section class="input-section">
+                    <h2>Add Product to Inventory</h2>
+                    <form id="productForm">
+                        <div class="form-group">
+                            <label for="productName">Product Name:</label>
+                            <input 
+                                type="text" 
+                                id="productName" 
+                                placeholder="e.g., Rice, Sugar, Flour" 
+                                required
+                            >
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="quantity">Quantity in Stock:</label>
+                                <input 
+                                    type="number" 
+                                    id="quantity" 
+                                    placeholder="0" 
+                                    min="0" 
+                                    step="0.01"
+                                    value="0"
+                                    required
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label for="unit">Unit (kg, liter, pieces, etc):</label>
+                                <input 
+                                    type="text" 
+                                    id="unit" 
+                                    placeholder="e.g., kg, liter, pcs" 
+                                    value="kg"
+                                    required
+                                >
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="purchasePrice">Purchase Price (TSh):</label>
+                                <input 
+                                    type="number" 
+                                    id="purchasePrice" 
+                                    placeholder="0.00" 
+                                    min="0" 
+                                    step="0.01"
+                                    required
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label for="sellingPrice">Selling Price (TSh):</label>
+                                <input 
+                                    type="number" 
+                                    id="sellingPrice" 
+                                    placeholder="0.00" 
+                                    min="0" 
+                                    step="0.01"
+                                    required
+                                >
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="minStock">Minimum Stock Level:</label>
+                                <input 
+                                    type="number" 
+                                    id="minStock" 
+                                    placeholder="Alert when below this" 
+                                    min="0" 
+                                    step="0.01"
+                                    value="5"
+                                    required
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label for="category">Category:</label>
+                                <select id="category" required>
+                                    <option value="">Select Category</option>
+                                    <option value="Grains">Grains (Rice, Flour)</option>
+                                    <option value="Oils & Spices">Oils & Spices</option>
+                                    <option value="Sugar & Sweets">Sugar & Sweets</option>
+                                    <option value="Dairy">Dairy Products</option>
+                                    <option value="Vegetables">Vegetables</option>
+                                    <option value="Fruits">Fruits</option>
+                                    <option value="Beverages">Beverages</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Add Product</button>
+                    </form>
+                </section>
+
+                <!-- Inventory Summary Section -->
+                <section class="stats-section">
+                    <h2>Inventory Overview</h2>
+                    <div class="stats-container">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Products</div>
+                            <div class="stat-value" id="totalProducts">0</div>
+                        </div>
+                        <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                            <div class="stat-label">Total Stock Value (TSh)</div>
+                            <div class="stat-value" id="totalValue">0</div>
+                        </div>
+                        <div class="stat-card" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                            <div class="stat-label">Low Stock Alerts</div>
+                            <div class="stat-value" id="lowStockCount">0</div>
+                        </div>
+                        <div class="stat-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                            <div class="stat-label">Out of Stock</div>
+                            <div class="stat-value" id="outOfStockCount">0</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Search & Filter Section -->
+                <section class="search-section">
+                    <div class="search-bar">
+                        <input 
+                            type="text" 
+                            id="searchInput" 
+                            placeholder="🔍 Search products..." 
+                            class="search-input"
+                        >
+                        <select id="categoryFilter" class="filter-select">
+                            <option value="">All Categories</option>
+                            <option value="Grains">Grains</option>
+                            <option value="Oils & Spices">Oils & Spices</option>
+                            <option value="Sugar & Sweets">Sugar & Sweets</option>
+                            <option value="Dairy">Dairy Products</option>
+                            <option value="Vegetables">Vegetables</option>
+                            <option value="Fruits">Fruits</option>
+                            <option value="Beverages">Beverages</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </section>
+
+                <!-- Inventory Table Section -->
+                <section class="inventory-section">
+                    <h2>Your Inventory</h2>
+                    <div class="list-container">
+                        <table id="inventoryTable" class="items-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Category</th>
+                                    <th>Stock</th>
+                                    <th>Unit</th>
+                                    <th>Purchase Price</th>
+                                    <th>Selling Price</th>
+                                    <th>Stock Value</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventoryList">
+                                <tr class="empty-state">
+                                    <td colspan="9">No products in inventory. Add your first product above!</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="exportInventory" class="btn btn-success">Export as CSV</button>
+                        <button id="printInventory" class="btn btn-secondary">Print</button>
+                    </div>
+                </section>
+
+                <!-- Low Stock Alerts Section -->
+                <section class="alerts-section">
+                    <h2>⚠️ Stock Alerts</h2>
+                    <div id="alertsContainer" class="alerts-container">
+                        <p class="empty-state">No alerts. Your inventory is healthy!</p>
+                    </div>
+                </section>
+            </main>
+
+            <footer>
+                <p>&copy; 2026 Shop Sales Tracker | Complete Inventory Management • Secure • Always Available</p>
+            </footer>
+        </div>
+    </div>
+
+    <script src="inventory.js"></script>
+</body>
+</html>
